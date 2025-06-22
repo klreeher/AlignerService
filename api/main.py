@@ -14,6 +14,23 @@ try:
 except Exception:
     GIT_COMMIT = "unknown"
 
+
+
+@app.route("/text/parse", methods=["POST"])
+def text_parse():
+    """Stub: convert plain text to structured XHTML."""
+    return jsonify({"message": "text parsing not implemented yet"}), 501
+
+@app.route("/assets/cover", methods=["POST"])
+def assets_cover():
+    """Stub: upload or generate cover image."""
+    return jsonify({"message": "cover generation not implemented yet"}), 501
+
+@app.route("/epub", methods=["POST"])
+def epub_build():
+    """Stub: build final EPUB from components."""
+    return jsonify({"message": "epub builder not implemented yet"}), 501
+
 @app.route("/audio/align", methods=["POST"])
 def audio_align():
     """Align audio and transcript using Montreal Forced Aligner.
