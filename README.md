@@ -3,12 +3,12 @@
 
 ## Build Docker image:
 ```bash
-docker build -t mfa-service .
+docker build -t aligner-service .
 ```
 
 ## Run Docker container:
 ```bash
-docker run -it -p 5000:5000 mfa-service
+docker run -it -p 5000:5000 aligner-service 
 ```
 
 ## Sample Request (Python):
