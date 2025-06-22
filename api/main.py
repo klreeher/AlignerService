@@ -3,6 +3,7 @@ from flasgger import Swagger
 import datetime, subprocess
 from datetime import datetime, timezone
 from audio.aligner import run_alignment
+from textprep.parser import parse_text_and_metadata
 
 app = Flask(__name__)
 swagger = Swagger(app, template={
@@ -54,7 +55,7 @@ def text_parse():
       501:
         description: Not yet implemented
     """
-    return jsonify({"message": "text parsing not implemented yet"}), 501
+    return parse_text_and_metadata(request)
 
 @app.route("/assets/cover", methods=["POST"])
 def assets_cover():
