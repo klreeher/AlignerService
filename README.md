@@ -43,4 +43,8 @@ Returns `input.TextGrid` containing aligned timing data.
 
 ---
 
+## API Docs
+
+http://172.17.0.2:5000/apidocs/
+
 Happy aligning! 🎧
