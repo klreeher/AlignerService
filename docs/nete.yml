@@ -1,0 +1,162 @@
+openapi: 3.0.3
+info:
+  title: Nete - Media-Rich EPUB Generation API
+  version: 0.1.1
+  description: |
+    Nete is an API service for generating high-quality, media-rich EPUB files from 
+    plain text, metadata, and audio. Inspired by the Boeotian muse of voice and melody, 
+    Nete handles text-to-XHTML conversion, audio alignment into SMIL overlays, asset 
+    management (like cover generation), and EPUB packaging.
+    
+    This API is modular, extensible, and designed for RESTful workflows.
+
+servers:
+  - url: http://localhost:8000
+
+paths:
+
+  /text/parse:
+    post:
+      summary: Convert plain text and metadata into structured XHTML and JSON.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  format: binary
+                metadata:
+                  type: string
+                  format: binary
+              required: [text, metadata]
+      responses:
+        '200':
+          description: Structured text and XHTML generated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  structured_text:
+                    type: string
+                    example: structured_text.json
+                  xhtml_files:
+                    type: array
+                    items:
+                      type: string
+
+  /audio/align:
+    post:
+      summary: Align audio file with structured text to create SMIL files.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                structured_text:
+                  type: string
+                  format: binary
+              required: [audio, structured_text]
+      responses:
+        '200':
+          description: SMIL files generated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  smil_files:
+                    type: array
+                    items:
+                      type: string
+
+  /assets/cover:
+    post:
+      summary: Upload or generate a cover image based on metadata.
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+                metadata:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Cover image processed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cover_file:
+                    type: string
+                    example: cover.jpg
+
+  /epub:
+    post:
+      summary: Assemble a complete EPUB package from input files and metadata.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                metadata:
+                  type: string
+                  format: binary
+                xhtml_files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                smil_files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                cover:
+                  type: string
+                  format: binary
+                css:
+                  type: string
+                  format: binary
+                fonts:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+              required: [metadata, xhtml_files]
+      responses:
+        '200':
+          description: EPUB built successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  epub_file:
+                    type: string
+                    example: book.epub
+                  log:
+                    type: string
+                  validation:
+                    type: object
+                    properties:
+                      epubcheck:
+                        type: string
+                        example: passed
