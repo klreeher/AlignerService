@@ -1,3 +1,4 @@
+pytest
 textgrid
 flasgger
 flask

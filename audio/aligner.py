@@ -3,8 +3,14 @@ import uuid, subprocess, os
 from flask import request, jsonify, send_from_directory, make_response
 
 def run_alignment(request):
+    if "audio" not in request.files:
+        return jsonify(error="Missing required audio file."), 400
     audio_file = request.files["audio"]
+
+    if "transcript" not in request.form:
+        return jsonify(error="Missing transcript."), 400
     transcript = request.form["transcript"]
+
     lang = request.form.get("language", "english_mfa")
     response_mode = request.form.get("response", "file")
 
