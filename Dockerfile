@@ -1,20 +1,23 @@
-FROM condaforge/mambaforge:22.11.1-4
+# syntax=docker/dockerfile:1
+FROM python:3.10-slim
 
-# Use conda instead of mamba
-COPY environment.yml .
-RUN conda env create -f environment.yml && conda clean -afy
-
-# Download required MFA models
-RUN conda run -n mfa_env mfa model download acoustic english_mfa && \
-    conda run -n mfa_env mfa model download dictionary english_mfa
-
-
-ENV PATH /opt/conda/envs/mfa_env/bin:$PATH
-
+# Set working directory
 WORKDIR /app
-COPY app.py requirements.txt ./
 
-RUN conda run -n mfa_env pip install -r requirements.txt
+# Install system dependencies (if needed by MFA or Flask)
+RUN apt-get update && apt-get install -y \
+    git \
+    ffmpeg \
+    sox \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-EXPOSE 5000
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+# Copy project
+COPY . .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Default run command
+CMD ["python", "api/main.py"]
