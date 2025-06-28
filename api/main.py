@@ -4,6 +4,9 @@ import datetime, subprocess
 from datetime import datetime, timezone
 from audio.aligner import run_alignment
 from textprep.parser import parse_text_and_metadata
+import io
+import json
+import os
 
 
 app = Flask(

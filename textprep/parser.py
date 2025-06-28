@@ -7,7 +7,8 @@ from flask import request, jsonify, render_template
 from pydantic import ValidationError
 from api.models.metadata import Metadata
 
-# --- Utility: Split plain text into paragraphs + fragments ---
+DEFAULT_OUTPUT_DIR = "/tmp"
+
 def parse_plain_text_to_paragraphs(text: str):
     """
     Splits plain text into paragraphs.
@@ -18,7 +19,6 @@ def parse_plain_text_to_paragraphs(text: str):
     paragraphs = []
 
     for para in raw_paragraphs:
-        # Clean up extra whitespace inside
         cleaned = " ".join(para.strip().splitlines()).strip()
         if cleaned:
             fragment = {"id": str(uuid4()), "text": cleaned}
@@ -26,15 +26,15 @@ def parse_plain_text_to_paragraphs(text: str):
 
     return paragraphs
 
+def parse_text_and_metadata(request, output_dir=None):
+    if output_dir is None:
+        output_dir = DEFAULT_OUTPUT_DIR
 
-# --- Main handler ---
-def parse_text_and_metadata(request):
     if "text" not in request.files:
         return jsonify(error="Missing required text file."), 400
     if "metadata" not in request.files:
         return jsonify(error="Missing metadata file."), 400
 
-    # Support single or multiple text files
     text_files = request.files.getlist("text")
     if not text_files:
         return jsonify(error="No text files found."), 400
@@ -46,7 +46,6 @@ def parse_text_and_metadata(request):
             return jsonify(error="Empty text file."), 400
         texts.append(content)
 
-    # Parse metadata
     metadata_file = request.files["metadata"]
     try:
         raw_metadata = json.load(metadata_file)
@@ -56,7 +55,6 @@ def parse_text_and_metadata(request):
     except ValidationError as e:
         return jsonify(error="Invalid metadata", details=e.errors()), 400
 
-    # --- Render XHTML files ---
     output_files = []
     structured_chapters = []
 
@@ -69,13 +67,13 @@ def parse_text_and_metadata(request):
         }
 
         xhtml_content = render_template(
-            "chapter.xhtml.j2",  # your real template file in templates/
+            "chapter.xhtml.j2",
             heading=heading,
             paragraphs=paragraphs
         )
 
         filename = f"chapter{index}.xhtml"
-        output_path = os.path.join("/tmp", filename)
+        output_path = os.path.join(output_dir, filename)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(xhtml_content)
 
@@ -85,7 +83,6 @@ def parse_text_and_metadata(request):
             "title": heading["text"]
         })
 
-    # --- Build response ---
     return jsonify({
         "structured_text": {
             "title": metadata.title,
