@@ -1,4 +1,11 @@
-pytest
-textgrid
-flasgger
-flask
+# Core web API
+Flask>=2.3,<3.0
+
+# API docs UI
+Flasgger>=0.9.7
+
+# Data validation
+pydantic>=2.0,<3.0
+
+# Optional: request helper for any outgoing calls
+requests>=2.31,<3.0

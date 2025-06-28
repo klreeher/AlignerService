@@ -1,0 +1,10 @@
+# Include prod runtime deps
+-r requirements.txt
+
+# Testing
+pytest>=8.0,<9.0
+
+# Optional: dev tools, if you lint/type-check
+# mypy>=1.8,<2.0
+# black>=24.0,<25.0
+# isort>=5.10,<6.0
