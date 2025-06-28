@@ -5,7 +5,12 @@ from datetime import datetime, timezone
 from audio.aligner import run_alignment
 from textprep.parser import parse_text_and_metadata
 
-app = Flask(__name__)
+
+app = Flask(
+    __name__,
+    template_folder="../textprep/templates"
+)
+
 swagger = Swagger(app, template={
     "swagger": "2.0",
     "info": {

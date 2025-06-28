@@ -12,7 +12,7 @@
 
 
 ## Project Structure
-
+  
 nete/
 ├── audio/         
 │   ├── aligner.py
