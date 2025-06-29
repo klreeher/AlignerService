@@ -42,7 +42,7 @@ stages:
     condition: succeeded()
     jobs:
       - job: BuildAndPush
-        displayName: 'Build and push image'
+        displayName: 'Build, push and publish image'
         steps:
           - checkout: self
 
@@ -62,6 +62,16 @@ stages:
               tags: |
                 $(Build.BuildId)
 
+          # ✅ Save the image as a .tar file
+          - script: |
+              docker save $(imageName):$(Build.BuildId) -o $(Build.ArtifactStagingDirectory)/nete-service.tar
+            displayName: 'Save Docker image as tar'
+
+          # ✅ Publish the .tar as a pipeline artifact
+          - publish: $(Build.ArtifactStagingDirectory)/nete-service.tar
+            artifact: docker-image
+
+          # ✅ Push only if main
           - task: Docker@2
             displayName: 'Push image to Docker Hub'
             condition: eq(variables['Build.SourceBranchName'], 'main')
