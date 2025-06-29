@@ -3,11 +3,8 @@ import uuid, subprocess, os
 from flask import request, jsonify, send_file, make_response
 
 
-def run_alignment(request, output_path=None):
-    job_id = str(uuid.uuid4())  
-    artifact_dir = os.getenv("ARTIFACT_DIR", "/tmp")
-
-    job_dir = os.path.join(artifact_dir, job_id)
+def run_alignment(request, artifact_dir="/tmp"):
+    job_dir = os.path.join(artifact_dir, str(uuid.uuid4()))
     os.makedirs(job_dir, exist_ok=True)
 
     if not output_path:

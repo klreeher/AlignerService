@@ -196,7 +196,9 @@ def audio_align():
       500:
         description: Alignment or MFA model error
     """
-    return run_alignment(request)
+    artifact_dir = os.getenv("ARTIFACT_DIR", "/tmp")
+    return run_alignment(request, artifact_dir=artifact_dir)
+
 
 
 @app.route("/version", methods=["GET"])
