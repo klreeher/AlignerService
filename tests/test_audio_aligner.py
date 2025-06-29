@@ -28,6 +28,8 @@ class TestAudioAligner:
         audio_filename, audio_bytes, response_mode, textgrid_content
     ):
         """Parametrized test: WAV, MP3, JSON inline mode"""
+        monkeypatch.setenv("ARTIFACT_DIR", str(tmp_path))  # ✅ Provide the env var!
+
         monkeypatch.setattr(
             "audio.aligner.subprocess.run",
             lambda *a, **k: subprocess.CompletedProcess(a[0], 0)
@@ -36,19 +38,22 @@ class TestAudioAligner:
         monkeypatch.setattr("audio.aligner.os.makedirs", lambda *a, **k: None)
         monkeypatch.setattr("audio.aligner.os.path.exists", lambda path: True)
 
+        # Create fake output dir
         aligned_dir = tmp_path / "testjob" / "aligned"
         aligned_dir.mkdir(parents=True, exist_ok=True)
         textgrid_path = aligned_dir / "input.TextGrid"
         textgrid_path.write_text(textgrid_content)
 
-        # Safer monkeypatch: override only for the alignment output, else fallback to real join
-        real_join = os.path.join
+        # ✅ Pre-create the *input* audio dir too!
+        audio_dir = tmp_path / "testjob" / "audio"
+        audio_dir.mkdir(parents=True, exist_ok=True)
 
+        # Patch join only for output
+        real_join = os.path.join
         def fake_join(*a):
             if "aligned" in a:
                 return str(textgrid_path)
             return real_join(*a)
-
         monkeypatch.setattr("audio.aligner.os.path.join", fake_join)
 
         data = {
@@ -61,8 +66,9 @@ class TestAudioAligner:
         response = client.post("/audio/align", data=data, content_type="multipart/form-data")
         assert response.status_code == 200
 
-    def test_missing_textgrid_after_success(self, monkeypatch, client):
+    def test_missing_textgrid_after_success(self, monkeypatch, client, tmp_path):
         """Should 500 if alignment runs but TextGrid is missing"""
+        monkeypatch.setenv("ARTIFACT_DIR", str(tmp_path))  # ✅
         monkeypatch.setattr(
             "audio.aligner.subprocess.run",
             lambda *a, **k: subprocess.CompletedProcess(a[0], 0)
@@ -70,6 +76,10 @@ class TestAudioAligner:
         monkeypatch.setattr("audio.aligner.uuid.uuid4", lambda: "testjob")
         monkeypatch.setattr("audio.aligner.os.makedirs", lambda *a, **k: None)
         monkeypatch.setattr("audio.aligner.os.path.exists", lambda path: False)
+
+        # ✅ Pre-create audio dir for input file save
+        audio_dir = tmp_path / "testjob" / "audio"
+        audio_dir.mkdir(parents=True, exist_ok=True)
 
         data = {
             "audio": (io.BytesIO(b"fake-wav"), "input.wav"),
@@ -88,13 +98,18 @@ class TestAudioAligner:
         response = client.post("/audio/align", data=data, content_type="multipart/form-data")
         assert response.status_code == 400
 
-    def test_alignment_subprocess_error(self, monkeypatch, client):
+    def test_alignment_subprocess_error(self, monkeypatch, client, tmp_path):
         """Should 500 if subprocess fails"""
+        monkeypatch.setenv("ARTIFACT_DIR", str(tmp_path))  # ✅
         monkeypatch.setattr(
             "audio.aligner.subprocess.run",
             lambda *a, **k: subprocess.CompletedProcess(a[0], 1)
         )
         monkeypatch.setattr("audio.aligner.uuid.uuid4", lambda: "testjob")
+
+        # ✅ Pre-create audio dir for input file save
+        audio_dir = tmp_path / "testjob" / "audio"
+        audio_dir.mkdir(parents=True, exist_ok=True)
 
         data = {
             "audio": (io.BytesIO(b"fake-wav"), "input.wav"),
