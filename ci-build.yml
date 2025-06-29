@@ -27,12 +27,12 @@ stages:
           - script: |
               python -m pip install --upgrade pip
               pip install -r requirements.txt
+              pip install pytest
             displayName: 'Install dependencies'
 
           - script: |
               pytest .
             displayName: 'Run tests'
-
   - stage: Build
     displayName: Build and Push Docker Image
     dependsOn: Test
