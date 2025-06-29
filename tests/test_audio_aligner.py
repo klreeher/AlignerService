@@ -28,7 +28,10 @@ class TestAudioAligner:
         audio_filename, audio_bytes, response_mode, textgrid_content
     ):
         """Parametrized test: WAV, MP3, JSON inline mode"""
-        monkeypatch.setenv("ARTIFACT_DIR", str(tmp_path))  # ✅ Provide the env var!
+        monkeypatch.setenv("ARTIFACT_DIR", str(tmp_path))
+        
+        # ✅ Print the env var so you see it in CI logs:
+        print("ARTIFACT_DIR =", os.environ.get("ARTIFACT_DIR"))
 
         monkeypatch.setattr(
             "audio.aligner.subprocess.run",
