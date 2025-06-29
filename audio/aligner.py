@@ -3,7 +3,10 @@ import uuid, subprocess, os
 from flask import request, jsonify, send_file, make_response
 
 
-def run_alignment(request):
+def run_alignment(request, output_path=None):
+    if not output_path:
+        output_path = os.path.join(job_dir, "aligned", "input.TextGrid")
+
     if "audio" not in request.files:
         return jsonify(error="Missing required audio file."), 400
     audio_file = request.files["audio"]

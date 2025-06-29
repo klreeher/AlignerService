@@ -41,10 +41,15 @@ class TestAudioAligner:
         textgrid_path = aligned_dir / "input.TextGrid"
         textgrid_path.write_text(textgrid_content)
 
-        monkeypatch.setattr(
-            "audio.aligner.os.path.join",
-            lambda *a: str(textgrid_path)
-        )
+        # Safer monkeypatch: override only for the alignment output, else fallback to real join
+        real_join = os.path.join
+
+        def fake_join(*a):
+            if "aligned" in a:
+                return str(textgrid_path)
+            return real_join(*a)
+
+        monkeypatch.setattr("audio.aligner.os.path.join", fake_join)
 
         data = {
             "audio": (io.BytesIO(audio_bytes), audio_filename),
