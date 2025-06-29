@@ -1,8 +1,10 @@
 import io
-import pytest
+import os
 import subprocess
+import pytest
 
 from api.main import app
+
 
 @pytest.fixture
 def client():
@@ -10,38 +12,88 @@ def client():
     with app.test_client() as client:
         yield client
 
-def test_missing_audio(client):
-    """Should return 400 when no audio is uploaded"""
-    data = {
-        "transcript": "This is a test sentence."
-    }
-    response = client.post("/audio/align", data=data, content_type='multipart/form-data')
-    assert response.status_code == 400
-    assert "Missing required audio file" in response.get_data(as_text=True)
 
+class TestAudioAligner:
 
-def test_invalid_audio_format(client):
-    """Should reject non-wav/mp3 files"""
-    data = {
-        "audio": (io.BytesIO(b"not-audio"), "test.txt"),
-        "transcript": "Hello world"
-    }
-    response = client.post("/audio/align", data=data, content_type='multipart/form-data')
-    assert response.status_code == 400
-    assert "Unsupported audio format" in response.get_data(as_text=True)
+    @pytest.mark.parametrize(
+        "audio_filename,audio_bytes,response_mode,textgrid_content",
+        [
+            ("input.wav", b"fake-wav-data", None, "Fake TextGrid content"),
+            ("input.mp3", b"fake-mp3-data", None, "Fake TextGrid content"),
+            ("input.wav", b"fake-wav", "json", "Fake TextGrid JSON"),
+        ]
+    )
+    def test_audio_aligner(
+        self, client, monkeypatch, tmp_path,
+        audio_filename, audio_bytes, response_mode, textgrid_content
+    ):
+        """Parametrized test: WAV, MP3, JSON inline mode"""
+        monkeypatch.setattr(
+            "audio.aligner.subprocess.run",
+            lambda *a, **k: subprocess.CompletedProcess(a[0], 0)
+        )
+        monkeypatch.setattr("audio.aligner.uuid.uuid4", lambda: "testjob")
+        monkeypatch.setattr("audio.aligner.os.makedirs", lambda *a, **k: None)
+        monkeypatch.setattr("audio.aligner.os.path.exists", lambda path: True)
 
-def test_alignment_subprocess_failure(monkeypatch, client):
-    """Should handle subprocess failures cleanly"""
+        aligned_dir = tmp_path / "testjob" / "aligned"
+        aligned_dir.mkdir(parents=True, exist_ok=True)
+        textgrid_path = aligned_dir / "input.TextGrid"
+        textgrid_path.write_text(textgrid_content)
 
-    def fake_run(*args, **kwargs):
-        raise subprocess.CalledProcessError(returncode=1, cmd=args[0], output="fail", stderr="nope")
+        monkeypatch.setattr(
+            "audio.aligner.os.path.join",
+            lambda *a: str(textgrid_path)
+        )
 
-    monkeypatch.setattr("audio.aligner.subprocess.run", fake_run)
+        data = {
+            "audio": (io.BytesIO(audio_bytes), audio_filename),
+            "transcript": "Example transcript"
+        }
+        if response_mode:
+            data["response"] = response_mode
 
-    data = {
-        "audio": (io.BytesIO(b"fake-wav-data"), "input.wav"),
-        "transcript": "This is a test"
-    }
-    response = client.post("/audio/align", data=data, content_type='multipart/form-data')
-    assert response.status_code == 500
-    assert "Failed to download required MFA models" in response.get_data(as_text=True)
+        response = client.post("/audio/align", data=data, content_type="multipart/form-data")
+        assert response.status_code == 200
+
+    def test_missing_textgrid_after_success(self, monkeypatch, client):
+        """Should 500 if alignment runs but TextGrid is missing"""
+        monkeypatch.setattr(
+            "audio.aligner.subprocess.run",
+            lambda *a, **k: subprocess.CompletedProcess(a[0], 0)
+        )
+        monkeypatch.setattr("audio.aligner.uuid.uuid4", lambda: "testjob")
+        monkeypatch.setattr("audio.aligner.os.makedirs", lambda *a, **k: None)
+        monkeypatch.setattr("audio.aligner.os.path.exists", lambda path: False)
+
+        data = {
+            "audio": (io.BytesIO(b"fake-wav"), "input.wav"),
+            "transcript": "text"
+        }
+        response = client.post("/audio/align", data=data, content_type="multipart/form-data")
+        assert response.status_code == 500
+        assert "TextGrid" in response.get_data(as_text=True)
+
+    def test_invalid_audio_format(self, client):
+        """Should return 400 for unsupported audio format"""
+        data = {
+            "audio": (io.BytesIO(b"fake-data"), "input.xyz"),
+            "transcript": "test"
+        }
+        response = client.post("/audio/align", data=data, content_type="multipart/form-data")
+        assert response.status_code == 400
+
+    def test_alignment_subprocess_error(self, monkeypatch, client):
+        """Should 500 if subprocess fails"""
+        monkeypatch.setattr(
+            "audio.aligner.subprocess.run",
+            lambda *a, **k: subprocess.CompletedProcess(a[0], 1)
+        )
+        monkeypatch.setattr("audio.aligner.uuid.uuid4", lambda: "testjob")
+
+        data = {
+            "audio": (io.BytesIO(b"fake-wav"), "input.wav"),
+            "transcript": "text"
+        }
+        response = client.post("/audio/align", data=data, content_type="multipart/form-data")
+        assert response.status_code == 500

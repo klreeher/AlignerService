@@ -1,6 +1,7 @@
 # audio/aligner.py
 import uuid, subprocess, os
-from flask import request, jsonify, send_from_directory, make_response
+from flask import request, jsonify, send_file, make_response
+
 
 def run_alignment(request):
     if "audio" not in request.files:
@@ -32,19 +33,40 @@ def run_alignment(request):
     wd = f"/tmp/{job}"
     os.makedirs(f"{wd}/audio", exist_ok=True)
 
-    audio_path = f"{wd}/audio/input.wav"
+    # File paths
+    input_ext = os.path.splitext(audio_file.filename)[1].lower()
+    input_path = f"{wd}/audio/input{input_ext}"
+    wav_path = f"{wd}/audio/input.wav"
     lab_path = f"{wd}/audio/input.lab"
 
-    audio_file.save(audio_path)
+    audio_file.save(input_path)
     with open(lab_path, "w") as f:
         f.write(transcript)
 
-    out = f"{wd}/aligned"
+    # Convert MP3 to WAV if needed
+    if input_ext == ".mp3":
+        try:
+            subprocess.run([
+                "ffmpeg", "-i", input_path,
+                "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le",
+                wav_path
+            ], check=True)
+        except subprocess.CalledProcessError as e:
+            return jsonify({
+                "error": "Failed to convert MP3 to WAV",
+                "message": str(e)
+            }), 500
+    else:
+        # Already WAV
+        wav_path = input_path
+
+    out_dir = f"{wd}/aligned"
+
     try:
-        result = subprocess.run([
-            "mfa", "align",
-            f"{wd}/audio", lang, lang, out
-        ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        subprocess.run(
+            ["mfa", "align", f"{wd}/audio", lang, lang, out_dir],
+            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
     except subprocess.CalledProcessError as e:
         return make_response(jsonify({
             "error": "MFA alignment failed",
@@ -53,20 +75,28 @@ def run_alignment(request):
             "stderr": e.stderr
         }), 500)
 
-    tg_path = os.path.join(out, "input.TextGrid")
+    tg_filename = "input.TextGrid"
+    tg_path = os.path.join(out_dir, tg_filename)
+
+    if not os.path.exists(tg_path):
+        return jsonify(error="Alignment finished but output TextGrid was not found."), 500
+
+    result = {
+        "job_id": job,
+        "textgrid_file": tg_filename,
+        "textgrid_path": tg_path
+    }
 
     if response_mode == "json":
         try:
             with open(tg_path, "r") as f:
-                textgrid_content = f.read()
-            return jsonify({
-                "filename": "input.TextGrid",
-                "content": textgrid_content
-            })
+                result["content"] = f.read()
         except Exception as e:
             return jsonify(error="Failed to read TextGrid file", message=str(e)), 500
+        return jsonify(result), 200
     else:
-        response = make_response(send_from_directory(directory=out, path="input.TextGrid", mimetype="text/plain"))
-        response.headers["Content-Disposition"] = "attachment; filename=input.TextGrid"
+        response = make_response(send_file(tg_path, mimetype="text/plain"))
+        response.headers["Content-Disposition"] = f"attachment; filename={tg_filename}"
         response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["X-Job-Id"] = job
         return response

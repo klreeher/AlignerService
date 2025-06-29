@@ -151,6 +151,7 @@ def epub_build():
 def audio_align():
     """
     Align audio and transcript using Montreal Forced Aligner.
+
     ---
     consumes:
       - multipart/form-data
@@ -173,15 +174,30 @@ def audio_align():
         type: string
         enum: [json, file]
         default: file
+
     responses:
       200:
-        description: Aligned TextGrid content or file
+        description: If `response=json`, returns job ID, file name, and TextGrid content.
+        schema:
+          type: object
+          properties:
+            job_id:
+              type: string
+              description: Unique ID for the alignment job.
+            textgrid_file:
+              type: string
+            textgrid_path:
+              type: string
+            content:
+              type: string
+              description: Only present if response=json
       400:
-        description: Invalid input format
+        description: Invalid input format (missing audio or transcript)
       500:
-        description: Alignment or model error
+        description: Alignment or MFA model error
     """
     return run_alignment(request)
+
 
 @app.route("/version", methods=["GET"])
 def version():
