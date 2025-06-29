@@ -1,15 +1,19 @@
-# audio/aligner.py
-import uuid, subprocess, os
+import uuid
+import subprocess
+import os
 from flask import request, jsonify, send_file, make_response
 
 
 def run_alignment(request, artifact_dir="/tmp"):
-    job_dir = os.path.join(artifact_dir, str(uuid.uuid4()))
-    os.makedirs(job_dir, exist_ok=True)
+    # Create a unique job directory under the artifact root
+    job_id = str(uuid.uuid4())
+    job_dir = os.path.join(artifact_dir, job_id)
+    audio_dir = os.path.join(job_dir, "audio")
+    out_dir = os.path.join(job_dir, "aligned")
 
-    if not output_path:
-        output_path = os.path.join(job_dir, "aligned", "input.TextGrid")
+    os.makedirs(audio_dir, exist_ok=True)
 
+    # Validate input
     if "audio" not in request.files:
         return jsonify(error="Missing required audio file."), 400
     audio_file = request.files["audio"]
@@ -21,9 +25,12 @@ def run_alignment(request, artifact_dir="/tmp"):
     lang = request.form.get("language", "english_mfa")
     response_mode = request.form.get("response", "file")
 
-    if not audio_file.filename.lower().endswith((".wav", ".mp3")):
+    # Validate audio format
+    input_ext = os.path.splitext(audio_file.filename)[1].lower()
+    if input_ext not in [".wav", ".mp3"]:
         return jsonify(error="Unsupported audio format. Please upload a .wav or .mp3 file."), 400
 
+    # Download MFA models
     try:
         subprocess.run(["mfa", "model", "download", "dictionary", lang], check=True)
         subprocess.run(["mfa", "model", "download", "acoustic", lang], check=True)
@@ -35,15 +42,10 @@ def run_alignment(request, artifact_dir="/tmp"):
             "stderr": e.stderr
         }), 500
 
-    job = str(uuid.uuid4())
-    wd = f"/tmp/{job}"
-    os.makedirs(f"{wd}/audio", exist_ok=True)
-
-    # File paths
-    input_ext = os.path.splitext(audio_file.filename)[1].lower()
-    input_path = f"{wd}/audio/input{input_ext}"
-    wav_path = f"{wd}/audio/input.wav"
-    lab_path = f"{wd}/audio/input.lab"
+    # Save audio and transcript
+    input_path = os.path.join(audio_dir, f"input{input_ext}")
+    wav_path = os.path.join(audio_dir, "input.wav")
+    lab_path = os.path.join(audio_dir, "input.lab")
 
     audio_file.save(input_path)
     with open(lab_path, "w") as f:
@@ -63,14 +65,12 @@ def run_alignment(request, artifact_dir="/tmp"):
                 "message": str(e)
             }), 500
     else:
-        # Already WAV
-        wav_path = input_path
+        wav_path = input_path  # Already WAV
 
-    out_dir = f"{wd}/aligned"
-
+    # Run MFA aligner
     try:
         subprocess.run(
-            ["mfa", "align", f"{wd}/audio", lang, lang, out_dir],
+            ["mfa", "align", audio_dir, lang, lang, out_dir],
             check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
     except subprocess.CalledProcessError as e:
@@ -81,18 +81,19 @@ def run_alignment(request, artifact_dir="/tmp"):
             "stderr": e.stderr
         }), 500)
 
+    # Verify output TextGrid
     tg_filename = "input.TextGrid"
     tg_path = os.path.join(out_dir, tg_filename)
-
     if not os.path.exists(tg_path):
         return jsonify(error="Alignment finished but output TextGrid was not found."), 500
 
     result = {
-        "job_id": job,
+        "job_id": job_id,
         "textgrid_file": tg_filename,
         "textgrid_path": tg_path
     }
 
+    # Respond with JSON or file download
     if response_mode == "json":
         try:
             with open(tg_path, "r") as f:
@@ -104,5 +105,5 @@ def run_alignment(request, artifact_dir="/tmp"):
         response = make_response(send_file(tg_path, mimetype="text/plain"))
         response.headers["Content-Disposition"] = f"attachment; filename={tg_filename}"
         response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["X-Job-Id"] = job
+        response.headers["X-Job-Id"] = job_id
         return response
