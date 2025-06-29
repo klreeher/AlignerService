@@ -14,25 +14,27 @@ stages:
   - stage: Test
     displayName: Run Tests
     jobs:
-    - job: RunTests
-      displayName: 'Run Pytest'
-      steps:
-        - checkout: self
+      - job: RunTests
+        displayName: 'Run Pytest'
+        steps:
+          - checkout: self
 
-        - task: UsePythonVersion@0
-          inputs:
-            versionSpec: '3.x'
-            addToPath: true
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.x'
+              addToPath: true
 
-        - script: |
-            python -m pip install --upgrade pip
-            pip install -r requirements.txt
-            pip install pytest
-          displayName: 'Install dependencies'
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+              pip install pytest
+            displayName: 'Install dependencies'
 
-        - script: |
-            pytest .
-          displayName: 'Run tests'
+          - script: |
+              pytest .
+            displayName: 'Run tests'
+            env:
+              ARTIFACT_DIR: $(Build.ArtifactStagingDirectory)
 
   - stage: Build
     displayName: Build and Push Docker Image
@@ -40,25 +42,26 @@ stages:
     condition: succeeded()
     jobs:
       - job: BuildAndPush
-        displayName: 'Build and push image if on main'
+        displayName: 'Build and push image'
         steps:
           - checkout: self
-
-          - task: Docker@2
-            displayName: 'Build Docker image'
-            inputs:
-              containerRegistry: ''
-              repository: $(imageName)
-              command: build
-              Dockerfile: '**/Dockerfile'
-              tags: |
-                $(Build.BuildId)
 
           - task: Docker@2
             displayName: 'Login to Docker Hub'
             inputs:
               containerRegistry: 'madecunningly@dockerhub'
               command: 'login'
+
+          - task: Docker@2
+            displayName: 'Build Docker image'
+            inputs:
+              containerRegistry: 'madecunningly@dockerhub'
+              repository: $(imageName)
+              command: build
+              Dockerfile: '**/Dockerfile'
+              tags: |
+                $(Build.BuildId)
+
           - task: Docker@2
             displayName: 'Push image to Docker Hub'
             condition: eq(variables['Build.SourceBranchName'], 'main')
