@@ -4,6 +4,10 @@ from flask import request, jsonify, send_file, make_response
 
 
 def run_alignment(request, output_path=None):
+    job_id = str(uuid.uuid4())  # or however you generate it
+    job_dir = os.path.join("jobs", job_id)
+    os.makedirs(job_dir, exist_ok=True)
+
     if not output_path:
         output_path = os.path.join(job_dir, "aligned", "input.TextGrid")
 
