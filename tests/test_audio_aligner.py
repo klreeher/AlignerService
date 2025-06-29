@@ -51,14 +51,6 @@ class TestAudioAligner:
         audio_dir = tmp_path / "testjob" / "audio"
         audio_dir.mkdir(parents=True, exist_ok=True)
 
-        # Patch join only for output
-        real_join = os.path.join
-        def fake_join(*a):
-            if "aligned" in a:
-                return str(textgrid_path)
-            return real_join(*a)
-        monkeypatch.setattr("audio.aligner.os.path.join", fake_join)
-
         data = {
             "audio": (io.BytesIO(audio_bytes), audio_filename),
             "transcript": "Example transcript"
@@ -69,6 +61,7 @@ class TestAudioAligner:
         response = client.post("/audio/align", data=data, content_type="multipart/form-data")
         assert response.status_code == 200
 
+    
     def test_missing_textgrid_after_success(self, monkeypatch, client, tmp_path):
         """Should 500 if alignment runs but TextGrid is missing"""
         monkeypatch.setenv("ARTIFACT_DIR", str(tmp_path))  # ✅
